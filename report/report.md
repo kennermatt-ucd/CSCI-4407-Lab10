@@ -266,34 +266,34 @@ for idx, item in enumerate(results):
 
 ```
 Trial 1
-Commitment: 25df694b2376b92546ded5c7f8b252902372a56c1dce92ac31a87de40a3d23fd
-Opening:    {'message': '42', 'randomness_hex': '956cc8e38ce157c33dbd2b3e4e8708b3'}
+Commitment: baa7121b0f03a3585dd04e969daed8506afbda33e3ea7fa47f5697f054e24f81
+Opening:    {'message': '42', 'randomness_hex': '790be23655306a8bf26bce4875ebc5c4'}
 Verify:     True
 ------------------------------------------------------------
 Trial 2
-Commitment: 7b00539d6d9a21a0349bee9338b75d68eec23c2daf81c0064655a47c02081929
-Opening:    {'message': '42', 'randomness_hex': 'db3193fd27b40188426b9401d7fe6cd8'}
+Commitment: f8ef37bfa0b83eb1a7fc8a9fb6b906cb93c4eaa4e20ec8c7833a3df9feeef0c3
+Opening:    {'message': '42', 'randomness_hex': 'aa618d61e4419d57fcba147a3d987f18'}
 Verify:     True
 ------------------------------------------------------------
 Trial 3
-Commitment: 53388fc267187885268e218a3fc2d0cc6686ccc3b8367eaa5cddfa037fb1462c
-Opening:    {'message': '42', 'randomness_hex': '5c70660f4fe17b0320154265980af73a'}
+Commitment: 87169edc50eceef1f0bc804f3b7cca7f8a4ec9f506f7a481265d299c90761309
+Opening:    {'message': '42', 'randomness_hex': '6d9857f54d148f060786b2ff9f0d9e6f'}
 Verify:     True
 ------------------------------------------------------------
 Trial 4
-Commitment: 5d9522460042aff43f8f2041610225ff9dccd64a0a8ca840a6fcdc37c888ea5a
-Opening:    {'message': '42', 'randomness_hex': 'ea7570e12e4424af1c3b5bb4c5d113f2'}
+Commitment: 3094fe1e949d8ee461602c726634add0828154ad73de01017c2a3cc51a17de46
+Opening:    {'message': '42', 'randomness_hex': '95f4fe80e556076c8417f9f1cdf0c53c'}
 Verify:     True
 ------------------------------------------------------------
 Trial 5
-Commitment: 31136a863b8a124118d69931224ead753d24d5689e619e9612a1057fc8d83592
-Opening:    {'message': '42', 'randomness_hex': '4568827498aa53fe9bf009660ada0c77'}
+Commitment: 5cb45c50cdc0b90064d4d3f5815fd7c4d9ef9adc609da008ccc7e902693e938e
+Opening:    {'message': '42', 'randomness_hex': '072bd9d27dc0411251345a17f0ff445c'}
 Verify:     True
 ------------------------------------------------------------
+
 ```
 
-> [SCREENSHOT – terminal running randomized_hash_experiment.py showing 5 distinct commitments for the same message "42"]
-
+![task5 output](task5.png)
 ### Explanation
 
 Every trial commits to the same message `"42"` but produces a completely different commitment string because each call to `commit_hash_randomized` draws a fresh 128-bit random nonce `r` from `secrets.token_bytes(16)`. The commitment is computed as `H(r || m)`, so even though `m` is constant, the input to SHA-256 differs each time, producing an unrelated output.
@@ -357,17 +357,17 @@ print(f"Randomized scheme accuracy:    {rand_acc:.0%}  (expect ~50%)")
 === Hiding Experiment: Adversary Guessing Accuracy ===
 
 Deterministic scheme accuracy: 100%  (expect ~100%)
-Randomized scheme accuracy:    54%   (expect ~50%)
+Randomized scheme accuracy:    52%   (expect ~50%)
 ```
 
-> [SCREENSHOT – terminal running hiding_experiment.py]
-
+![task6](task6.png)
 ### Results Table
 
-| Scheme        | Accuracy |
-| ------------- | -------- |
-| Deterministic | ~100%    |
-| Randomized    | ~50%     |
+| Scheme                        | Adversary Accuracy | Expected Behavior | Interpretation                                                   |
+| ----------------------------- | -----------------: | ----------------: | ---------------------------------------------------------------- |
+| Deterministic hash commitment |               100% |             ~100% | The attacker can perfectly identify which message was committed. |
+| Randomized hash commitment    |                52% |              ~50% | The attacker performs about the same as random guessing.         |
+
 
 ### Explanation
 
@@ -383,17 +383,22 @@ This result directly illustrates the formal hiding game from the lecture. A sche
 
 ### Objective
 
-Explain binding property.
+Explain what the binding property means and why collision resistance matters for hash-based commitment schemes.
 
 ### Evidence
 
-> [HANDWRITTEN]
+![task7](task7a.png)
+![task7b](task7b.png)
 
 ### Explanation
 
-* Binding = cannot open two ways
-* Requires collision resistance
-* Not proven by experiments
+#### Why “I tried and failed” is not a proof of security
+
+“I tried and failed” is not a proof of security because an experiment only tests a limited number of cases. If I run the program many times and do not find two valid openings for the same commitment, that only means my specific attempts did not find a collision. It does not prove that a collision does not exist, and it does not prove that a stronger attacker with more time, better methods, or more computing power could not find one. Security requires reasoning about what any efficient attacker can realistically do, not just what happened in a small experiment.
+
+#### Why computational infeasibility is the right lens
+
+Computational infeasibility is the right lens because cryptographic security usually does not mean that an attack is mathematically impossible. Instead, it means the attack would require so much time and computing power that it is unrealistic in practice. For hash-based commitments, breaking binding would require finding two different openings that produce the same hash output. If the hash function is collision-resistant, then finding such a collision should be computationally infeasible. This means the scheme is considered secure because no efficient attacker should be able to break it within realistic limits.
 
 ---
 
