@@ -92,27 +92,9 @@ sha256sum guess_player.txt casino_secret.txt coin_input_a.txt coin_input_b.txt
 
 ### Output Evidence
 
-```
-42
-77
-1
-0
+![alt text](image-1.png)
 
-/Commitment_Schemes_Lab
-total 24
--rw-r--r-- 1 user user   3 casino_secret.txt
--rw-r--r-- 1 user user   2 coin_input_a.txt
--rw-r--r-- 1 user user   2 coin_input_b.txt
--rw-r--r-- 1 user user   2 guess_player.txt
-...
-
-084c799cd551dd1d8d5c5f9a5d593b2e931f5e36122ee5c793c1d08a19839cc0  guess_player.txt
-94d5a38598be77593d4781b8fbd74cb4e2cd05bb006b1b531988ab2db90de9c9  casino_secret.txt
-4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  coin_input_a.txt
-9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  coin_input_b.txt
-```
-
-> [SCREENSHOT – terminal showing directory setup, file contents, and sha256sum output]
+![alt text](image-2.png)
 
 ### Explanation
 
@@ -124,19 +106,12 @@ More broadly, fixing values during protocol reasoning is a standard technique in
 
 ## Task 2 – Unfair Casino Protocol Analysis
 
-### Objective
+![alt text](image.png)
 
-Analyze fairness failure.
+### Why the Protocol Fails
 
-### Evidence
-
-> [HANDWRITTEN / TYPED WORK]
-
-### Explanation
-
-* Honest expected value
-* Cheating strategy
-* Why order of information breaks fairness
+The failure is not weak randomness — the casino's T may still be drawn "randomly" from the remaining 99 values. The failure is **information asymmetry induced by message ordering**. Fairness requires T ⊥ G, i.e. P(T = t | G = g) = P(T = t) = 1/100 for all g, t. The naive protocol violates this: because G is revealed before T is chosen, the casino can condition on G, producing a distribution where (See screenshot)
+T and G are therefore not independent, and no prize structure can restore the player's expected value. Any protocol where one party reveals a committed value before the other party chooses breaks this independence requirement.
 
 ---
 
@@ -201,14 +176,7 @@ if __name__ == "__main__":
 
 ### Output Evidence
 
-```
-Weak commitment:       73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049
-Weak verify:           True
-Randomized commitment: 97e772c9a0d2a7fbfbdbe33ba23e5fb23cb5a79f7f89ce201104dc17ccb37701
-Randomized verify:     True
-```
-
-> [SCREENSHOT – terminal running commitment_utils.py]
+![alt text](image-3.png)
 
 ### Explanation
 
@@ -255,37 +223,7 @@ for secret_message in secrets_to_test:
 
 ### Output Evidence
 
-```
-=== Weak Hash Commitment Brute-Force Attack ===
-
-Secret:              77
-Observed commitment: a88a7902cb4ef697ba0b6759c50e8c10297ff58f942243de19b984841bfe1f73
-Recovered message:   77
-Attack succeeded:    True
-------------------------------------------------------------
-Secret:              17
-Observed commitment: 4523540f1504cd17100c4835e85b7eefd49911580f8efff0599a8f283be6b9e3
-Recovered message:   17
-Attack succeeded:    True
-------------------------------------------------------------
-Secret:              42
-Observed commitment: 73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049
-Recovered message:   42
-Attack succeeded:    True
-------------------------------------------------------------
-Secret:              99
-Observed commitment: 8c1f1046219ddd216a023f792356ddf127fce372a72ec9b4cdac989ee5b0b455
-Recovered message:   99
-Attack succeeded:    True
-------------------------------------------------------------
-Secret:              1
-Observed commitment: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
-Recovered message:   1
-Attack succeeded:    True
-------------------------------------------------------------
-```
-
-> [SCREENSHOT – terminal running weak_hash_attack.py showing 5 successful recoveries]
+![alt text](image-4.png)
 
 ### Explanation
 
