@@ -474,7 +474,7 @@ if __name__ == "__main__":
 
 ### Output Evidence
 
-![Task 8 test](task8.png)
+![Task 8 test](task8.png)  
 
 ### Explanation
 
@@ -486,7 +486,7 @@ When the sender commits by sending C=EncK(M) over the network then the receiver 
 Why a toy encryption experiment is not itself a proof of commitment security?   
 While the toy XOR cipher proves that it can hide data, it completely fails at binding that same data. If we commit to C, and later want to change my message to a fake message, we just calculate a fake key K′=C⊕M′ for said message. When the receiver verifies this message key combo it will exactly equal the value of C, and the cheat will succeed. Real commitment schemes require strong binding properties that of which standard symmetric encryption does not naturally provide without additional cryptographic structures (like MACs or authenticated encryption).  
 
-**Part B – Public-Key Construction (Conceptual)**
+**Part B – Public-Key Construction (Conceptual)**  
 
 The Sender generates a key pair (PK,SK) and gives the public key PK to the Sender.    
 
@@ -494,11 +494,11 @@ The Sender encrypts the message M and the random value R using the public key: C
 
 The Sender reveals M and R.  
 
-The Receiver re-encrypts M and R using their own public key, so if Epk(M;R)==C, the reciever accepts the message.  
+The Receiver re-encrypts M and R using their own public key, so if Epk(M;R)==C, the reciever accepts the message.    
 
-Why it works:
+Why it works:  
 
-Hiding holds because the encryption is semantically secure under the public key—seeing C reveals nothing about M to an adversary without sk. Binding holds because any valid opening of C is a pair (M, R) such that E_pk(M; R) = C. If the encryption scheme has unique decryption under sk, then C can decrypt to at most one M, making it computationally infeasible to find two different openings. This construction is stronger than the hash-based scheme in that binding is tied to a computational assumption about the asymmetric cipher rather than collision resistance of a hash.
+Hiding holds because the encryption is semantically secure under the public key—seeing C reveals nothing about M to an adversary without sk. Binding holds because any valid opening of C is a pair (M, R) such that E_pk(M; R) = C. If the encryption scheme has unique decryption under sk, then C can decrypt to at most one M, making it computationally infeasible to find two different openings. This construction is stronger than the hash-based scheme in that binding is tied to a computational assumption about the asymmetric cipher rather than collision resistance of a hash.  
 
 ---
 
@@ -565,16 +565,16 @@ if __name__ == "__main__":
 
 ### Output Evidence
 
-![Task 9 Outputs](task91.png)
-![Task 9 Outputs](task92.png)
-![Task 9 Outputs](task93.png)
-![Task 9 Outputs](task94.png)
+![Task 9 Outputs](task91.png)  
+![Task 9 Outputs](task92.png)  
+![Task 9 Outputs](task93.png)  
+![Task 9 Outputs](task94.png)  
 
 ### Explanation
 
-The commitment must be sent before Bob chooses b, as this enforces the Commit first, reveal later order of operations. If Bob chooses 'b' before Alice is able to commit then Alice can easily choose 'a' such that a⊕b equals her desired outcome. By forcing Alice to commit to C first it gives the ensurance Bob knows Alice's choice is locked in, so then Bob can properly choose b.
+The commitment must be sent before Bob chooses b, as this enforces the Commit first, reveal later order of operations. If Bob chooses 'b' before Alice is able to commit then Alice can easily choose 'a' such that a⊕b equals her desired outcome. By forcing Alice to commit to C first it gives the ensurance Bob knows Alice's choice is locked in, so then Bob can properly choose b.  
 
-a⊕b acts as the final common coin so that the XOR operation guarantees a perfectly fair 50/50 distribution as long as at least one party plays honestly and chooses their bit randomly. Even if Alice maliciously tries to force a "1", Bob's subsequent random choice of b will randomize the final outcome of a⊕b, this ensures that neither party can dictate the final result alone.
+a⊕b acts as the final common coin so that the XOR operation guarantees a perfectly fair 50/50 distribution as long as at least one party plays honestly and chooses their bit randomly. Even if Alice maliciously tries to force a "1", Bob's subsequent random choice of b will randomize the final outcome of a⊕b, this ensures that neither party can dictate the final result alone.  
 
 ---
 
@@ -586,22 +586,22 @@ Analyze cheating.
 
 ### Evidence
 
-![Task 10 Work](Task10a.png)
-![Task 10 Work](Task10b.png)
+![Task 10 Work](Task10a.png)  
+![Task 10 Work](Task10b.png)  
 
 ### Explanation
 
-Hiding protects against an adversarial Bob: It ensures that Pr[A(C)→a]=12. Because Bob's extraction function E(C) fails, his choice of b is independent of a, ensuring a⊕b remains uniformly distributed.
+Hiding protects against an adversarial Bob: It ensures that Pr[A(C)→a]=12. Because Bob's extraction function E(C) fails, his choice of b is independent of a, ensuring a⊕b remains uniformly distributed.  
 
-Binding protects against an adversarial Alice: It ensures that finding (a0,r0),(a1,r1) where Commit(a0;r0)==Commit(a1;r1) occurs with negligible probability. Therefore, Alice's choice of a is fixed before she sees b, ensuring a⊕b remains uniformly distributed.
+Binding protects against an adversarial Alice: It ensures that finding (a0,r0),(a1,r1) where Commit(a0;r0)==Commit(a1;r1) occurs with negligible probability. Therefore, Alice's choice of a is fixed before she sees b, ensuring a⊕b remains uniformly distributed.  
 
-If Alice uses a weak deterministic hash:  C=H(a) where a∈{0,1},
+If Alice uses a weak deterministic hash:  C=H(a) where a∈{0,1},  
 
-Binding: Holds. It is computationally infeasible to finds H(0)==H(1) (Collision Resistance) therefore its impossible for Alice to cheat.
+Binding: Holds. It is computationally infeasible to finds H(0)==H(1) (Collision Resistance) therefore its impossible for Alice to cheat.  
 
-Hiding: Fails completely. Because the domain ∣a∣=2 it means that Bob computes H(0) and H(1). He can simply check if C==H(0) or C==H(1). Therefore allowing bob to, Pr[Bob(C)→a]=1 so it means that Bob can cheat with 100% success.
+Hiding: Fails completely. Because the domain ∣a∣=2 it means that Bob computes H(0) and H(1). He can simply check if C==H(0) or C==H(1). Therefore allowing bob to, Pr[Bob(C)→a]=1 so it means that Bob can cheat with 100% success.  
 
-A fair coin flip function requires both hiding and binding, as one property alone is not enough. If it is only hiding (but not binding) it means that Alice can cheat; If it is only binding (but not hiding) it means that Bob can cheat cheat. A secure, randomized hash commitment C=H(r∣∣a) provides both hashing and binding, forcing both parties to act blindly and irrevocably, which allows for a mathematically guaranteed fair 50/50 output via the XOR operation.
+A fair coin flip function requires both hiding and binding, as one property alone is not enough. If it is only hiding (but not binding) it means that Alice can cheat; If it is only binding (but not hiding) it means that Bob can cheat cheat. A secure, randomized hash commitment C=H(r∣∣a) provides both hashing and binding, forcing both parties to act blindly and irrevocably, which allows for a mathematically guaranteed fair 50/50 output via the XOR operation.  
 
 ---
 
@@ -665,15 +665,15 @@ print("Protocol Successful!")
 
 ### Output Evidence
 
-![Task 11 Outputs](task111.png)
-![Task 11 Outputs](task112.png)
-![Task 11 Outputs](task113.png)
+![Task 11 Outputs](task111.png)  
+![Task 11 Outputs](task112.png)  
+![Task 11 Outputs](task113.png)  
 
 ### Explanation
 
-Individual shares do not reveal the private input directly instead we look at Alice's shares in the output. Because the first two shares are generated purely at random, the shares look like completely a meaningless output of randomness. Bob receives 88 from Alice, which tells him absolutely nothing about her true salary of 17 so this means the secret is perfectly hidden.  
+Individual shares do not reveal the private input directly instead we look at Alice's shares in the output. Because the first two shares are generated purely at random, the shares look like completely a meaningless output of randomness. Bob receives 88 from Alice, which tells him absolutely nothing about her true salary of 17 so this means the secret is perfectly hidden.    
 
-The final sum is still recovered correctly it's just that the protocol works because modular arithmetic is commutative and associative so adding the rows and then the columns is mathematically identical to adding the columns and then the rows.  
+The final sum is still recovered correctly it's just that the protocol works because modular arithmetic is commutative and associative so adding the rows and then the columns is mathematically identical to adding the columns and then the rows.   
 
 (x1,1 + x1,2 + x1,3)+(x2,1 + etc. )≡(x1,1 + x2,1 + etc. )(modM)  
 
