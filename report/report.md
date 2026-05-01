@@ -411,102 +411,94 @@ Implement a toy symmetric encryption-based commitment and explain the public-key
 ### Code
 
 ```python
-import secrets
+import os
 
+# --- Toy Symmetric Encryption ---
+def xor_bytes(a: bytes, b: bytes) -> bytes:
+    """XOR's two byte strings that are of the same length"""
+    return bytes([x ^ y for x, y in zip(a, b)])
 
-def xor_key_stream(key: bytes, length: int) -> bytes:
-    stream = b""
-    while len(stream) < length:
-        stream += key
-    return stream[:length]
+def EncK(key: bytes, message: bytes) -> bytes:
+    """Encrypts by XOR'ing message with the key"""
+    #For this toy example the key must be exactly as long as the message or it will fail
+    if len(key) != len(message):
+        raise ValueError("Key must be the same length as the message.")
+    return xor_bytes(key, message)
 
-
-def toy_encrypt(key: bytes, message: str) -> bytes:
+#Commitment
+def commit_sym_enc(message: str):
+    """
+    Commitment via Encryption: C = Enc_K(M)
+    The key acts as our randomness that we will be using
+    """
     msg_bytes = message.encode()
-    stream = xor_key_stream(key, len(msg_bytes))
-    return bytes(a ^ b for a, b in zip(msg_bytes, stream))
+    #Generates a random key that is the same size as the message
+    key = os.urandom(len(msg_bytes))
+    
+    #The ciphertext is our commitment
+    c = EncK(key, msg_bytes)
+    
+    #Opening information requires BOTH our message and our key
+    opening = {"message": message, "key": key}
+    return c, opening
 
-
-def toy_decrypt(key: bytes, ciphertext: bytes) -> str:
-    stream = xor_key_stream(key, len(ciphertext))
-    return bytes(a ^ b for a, b in zip(ciphertext, stream)).decode()
-
-
-def commit_symmetric(message: str):
-    key = secrets.token_bytes(16)
-    ciphertext = toy_encrypt(key, message)
-    return ciphertext, {"message": message, "key_hex": key.hex()}
-
-
-def verify_symmetric(commitment: bytes, opening: dict) -> bool:
-    key = bytes.fromhex(opening["key_hex"])
-    decrypted = toy_decrypt(key, commitment)
-    return decrypted == opening["message"]
-
+def verify_sym_enc(c: bytes, opening: dict) -> bool:
+    """
+    Verification is performed by Re-encrypting M with K and checking if it matches C
+    """
+    message = opening["message"].encode()
+    key = opening["key"]
+    
+    #Recomputes what the ciphertext should or should actually be
+    expected_c = EncK(key, message)
+    
+    return c == expected_c
 
 if __name__ == "__main__":
-    print("=== Toy Symmetric Commitment Scheme ===\n")
-
-    for message in ["42", "heads", "17", "secret"]:
-        c, opening = commit_symmetric(message)
-        ok = verify_symmetric(c, opening)
-        print(f"Message:           {message!r}")
-        print(f"Ciphertext (hex):  {c.hex()}")
-        print(f"Key (hex):         {opening['key_hex']}")
-        print(f"Verify:            {ok}")
-        print("-" * 50)
+    m = "Hello Secure World!"
+    print(f"Original Message: '{m}'")
+    
+    #Commit Phase
+    c, opening = commit_sym_enc(m)
+    print("\nCommit Phase:")
+    print(f"Commitment (Ciphertext C) : {c.hex()}")
+    
+    #Reveal/Open Phase
+    print("\nOpen Phase:")
+    print(f"Sender reveals M: '{opening['message']}' and K: {opening['key'].hex()}")
+    
+    #Verify Phase
+    is_valid = verify_sym_enc(c, opening)
+    print(f"Verification Result: {is_valid}")
 ```
 
 ### Output Evidence
 
-```
-=== Toy Symmetric Commitment Scheme ===
-
-Message:           '42'
-Ciphertext (hex):  7607
-Key (hex):         423542dc7eed239d7e3445f90ce636b5
-Verify:            True
---------------------------------------------------
-Message:           'heads'
-Ciphertext (hex):  be3d033c12
-Key (hex):         d658625861e180e199b7c2fa17e14cce
-Verify:            True
---------------------------------------------------
-Message:           '17'
-Ciphertext (hex):  ad63
-Key (hex):         9c54cd2ff556ed828fb041fa396f8580
-Verify:            True
---------------------------------------------------
-Message:           'secret'
-Ciphertext (hex):  f9932fccb35a
-Key (hex):         8af64cbed62ea406dc7b53cd4cce12c2
-Verify:            True
---------------------------------------------------
-```
-
-> [SCREENSHOT – terminal running toy_symmetric_commit.py]
+![Task 8 test](task8.png)
 
 ### Explanation
 
 **Part A – Symmetric XOR Construction**
 
-The commitment is `C = Enc_K(M)` where `K` is a freshly generated 128-bit key and `Enc` is a repeating XOR keystream cipher. The opening information is `(M, K)`. Verification decrypts the ciphertext with `K` and checks that the result equals `M`.
+Why hiding appears plausible in the encryption-based view?   
+When the sender commits by sending C=EncK(M) over the network then the receiver receives the ciphertext. Because symmetric encryption (like AES or the One-Time Pad) is designed to be semantically secure it means that the ciphertext reveals absolutely nothing about the plaintext to anyone who doesn't hold the correct key. Therefore, the commitment scheme is able to perfectly hide that plain text within the cipher text.  
 
-Hiding appears plausible here because anyone who sees only `C` without knowing `K` cannot recover `M`—the XOR keystream looks random relative to the message. However, this toy experiment is not itself a proof of commitment security. A real proof would require showing that the encryption scheme is semantically secure, and XOR with a repeating key is not semantically secure for messages longer than the key.
-
-Binding is more subtle. The commitment `C = Enc_K(M)` is binding relative to the key `K`: there is only one decryption of `C` under a fixed `K`, so a committer cannot open `C` to two different messages using the same `K`. However, a committer who is allowed to choose a different key at opening time could potentially produce a collision, which would break binding. This is why real commitment schemes either tie the key to the commitment itself or use a hash to enforce uniqueness.
+Why a toy encryption experiment is not itself a proof of commitment security?   
+While the toy XOR cipher proves that it can hide data, it completely fails at binding that same data. If we commit to C, and later want to change my message to a fake message, we just calculate a fake key K′=C⊕M′ for said message. When the receiver verifies this message key combo it will exactly equal the value of C, and the cheat will succeed. Real commitment schemes require strong binding properties that of which standard symmetric encryption does not naturally provide without additional cryptographic structures (like MACs or authenticated encryption).  
 
 **Part B – Public-Key Construction (Conceptual)**
 
-In a public-key based commitment, a key pair `(pk, sk)` is generated and `pk` is published. The committer computes:
+The Sender generates a key pair (PK,SK) and gives the public key PK to the Sender.    
 
-```
-C = E_pk(M; R)
-```
+The Sender encrypts the message M and the random value R using the public key: C←Epk(M;R). The Sender then sends out C to the Receiver.  
 
-where `R` is fresh randomness used in the encryption. The opening is `(M, R)`. Verification re-encrypts `M` with `R` under `pk` and checks that the result matches `C`.
+The Sender reveals M and R.  
 
-Hiding holds because the encryption is semantically secure under the public key—seeing `C` reveals nothing about `M` to an adversary without `sk`. Binding holds because any valid opening of `C` is a pair `(M, R)` such that `E_pk(M; R) = C`. If the encryption scheme has unique decryption under `sk`, then `C` can decrypt to at most one `M`, making it computationally infeasible to find two different openings. This construction is stronger than the hash-based scheme in that binding is tied to a computational assumption about the asymmetric cipher rather than collision resistance of a hash.
+The Receiver re-encrypts M and R using their own public key, so if Epk(M;R)==C, the reciever accepts the message.  
+
+Why it works:
+
+Hiding holds because the encryption is semantically secure under the public key—seeing C reveals nothing about M to an adversary without sk. Binding holds because any valid opening of C is a pair (M, R) such that E_pk(M; R) = C. If the encryption scheme has unique decryption under sk, then C can decrypt to at most one M, making it computationally infeasible to find two different openings. This construction is stronger than the hash-based scheme in that binding is tied to a computational assumption about the asymmetric cipher rather than collision resistance of a hash.
 
 ---
 
@@ -522,63 +514,67 @@ Implement a fair two-party coin-flipping protocol using the randomized hash comm
 import random
 from commitment_utils import commit_hash_randomized, verify_hash_randomized
 
-print("=== Commitment-Based Fair Coin Flipping Protocol ===\n")
-print(f"{'Trial':<7} {'Alice':>6} {'Bob':>5} {'Coin':>5} {'Verify':>8}")
-print("-" * 40)
+print("=== Fair Coin-Flipping Protocol ===")
 
-for trial in range(1, 21):
-    # Step 1: Alice commits to her bit
+def run_trial(trial_num):
+    # --- Alice commits ---
+    #Alice chooses a random bit 'a'
     a = str(random.randint(0, 1))
-    C, opening = commit_hash_randomized(a)
-
-    # Step 2: Bob chooses his bit (after commitment is sent)
-    b = random.randint(0, 1)
-
-    # Step 3: Alice reveals; Bob verifies and computes coin
-    ok = verify_hash_randomized(C, opening)
-    if ok:
-        c = int(opening["message"]) ^ b
-        print(f"{trial:<7} {a:>6} {b:>5} {c:>5} {'OK':>8}")
+    
+    #Alice locks her choice in a commitment and sends ONLY 'C' to Bob
+    C, opening_a = commit_hash_randomized(a)
+    print(f"\nTrial {trial_num}:")
+    print(f"  Alice's secret bit 'a': {a}")
+    print(f"  Alice sends Commitment C: {C[:16]}...")
+    
+    # --- Bob chooses ---
+    #Bob must choose 'b' BEFORE seeing Alice's bit 'a'
+    b_int = random.randint(0, 1)
+    b = str(b_int)
+    print(f"  Bob sends bit 'b': {b}")
+    
+    # --- Alice reveals ---
+    #Now that Bob's choice is locked in, Alice reveals 'a'
+    print(f"  Alice opens commitment with: a={opening_a['message']}, rand={opening_a['randomness_hex'][:8]}...")
+    
+    # --- Bob verifies and calculates the coin ---
+    is_valid = verify_hash_randomized(C, opening_a)
+    
+    if is_valid:
+        #Both parties calculate the final coin
+        a_int = int(opening_a["message"])
+        common_coin = a_int ^ b_int
+        print(f"  Verification: SUCCESS. Common coin (a XOR b): {common_coin}")
+        return common_coin
     else:
-        print(f"{trial:<7} {'?':>6} {b:>5} {'-':>5} {'FAIL':>8}")
+        print("  Verification: FAILED. Alice cheated!")
+        return None
+
+if __name__ == "__main__":
+    #Runs at least 20 trials
+    results = []
+    for i in range(1, 21):
+        coin = run_trial(i)
+        results.append(coin)
+        
+    print("\n=== Final Results ===")
+    print(f"Total Flips: {len(results)}")
+    print(f"Heads (1): {results.count(1)}")
+    print(f"Tails (0): {results.count(0)}"))
 ```
 
 ### Output Evidence
 
-```
-=== Commitment-Based Fair Coin Flipping Protocol ===
-
-Trial    Alice   Bob  Coin   Verify
-----------------------------------------
-1            1     0     1       OK
-2            1     0     1       OK
-3            1     0     1       OK
-4            0     1     1       OK
-5            1     1     0       OK
-6            1     1     0       OK
-7            0     1     1       OK
-8            1     0     1       OK
-9            0     1     1       OK
-10           0     1     1       OK
-11           1     0     1       OK
-12           1     1     0       OK
-13           1     1     0       OK
-14           1     0     1       OK
-15           1     0     1       OK
-16           1     1     0       OK
-17           0     0     0       OK
-18           0     0     0       OK
-19           1     1     0       OK
-20           0     1     1       OK
-```
-
-> [SCREENSHOT – terminal running coinflip.py showing 20 trials all verifying OK]
+![Task 9 Outputs](Task91.png)
+![Task 9 Outputs](Task92.png)
+![Task 9 Outputs](Task93.png)
+![Task 9 Outputs](Task94.png)
 
 ### Explanation
 
-The commitment must be sent before Bob chooses `b`. This ordering is the key to fairness. If Alice committed after seeing `b`, she could choose `a` to force any coin value she wanted. By committing first, Alice locks her bit `a` into a cryptographic container before Bob's choice is known. The commitment scheme ensures she cannot change `a` after the fact (binding property), and Bob cannot determine `a` from the commitment before Alice reveals it (hiding property).
+The commitment must be sent before Bob chooses b, as this enforces the Commit first, reveal later order of operations. If Bob chooses 'b' before Alice is able to commit then Alice can easily choose 'a' such that a⊕b equals her desired outcome. By forcing Alice to commit to C first it gives the ensurance Bob knows Alice's choice is locked in, so then Bob can properly choose b.
 
-The final coin `c = a XOR b` is fair because neither party can control the output unilaterally. Alice fixes `a` before seeing `b`, so she cannot bias the XOR. Bob chooses `b` after the commitment is sent but before Alice reveals, so he is not adapting to `a` either. The XOR of two independently chosen bits is uniformly distributed over `{0, 1}`, giving each outcome equal probability. Verification ensures that Alice reveals the same `a` she originally committed to, and not a manipulated value.
+a⊕b acts as the final common coin so that the XOR operation guarantees a perfectly fair 50/50 distribution as long as at least one party plays honestly and chooses their bit randomly. Even if Alice maliciously tries to force a "1", Bob's subsequent random choice of b will randomize the final outcome of a⊕b, this ensures that neither party can dictate the final result alone.
 
 ---
 
@@ -590,13 +586,22 @@ Analyze cheating.
 
 ### Evidence
 
-> [HANDWRITTEN]
+![Task 10 Work](Task10a.png)
+![Task 10 Work](Task10b.png)
 
 ### Explanation
 
-* Alice cheats → breaks binding
-* Bob cheats → breaks hiding
-* Both required for fairness
+Hiding protects against an adversarial Bob: It ensures that Pr[A(C)→a]=12. Because Bob's extraction function E(C) fails, his choice of b is independent of a, ensuring a⊕b remains uniformly distributed.
+
+Binding protects against an adversarial Alice: It ensures that finding (a0,r0),(a1,r1) where Commit(a0;r0)==Commit(a1;r1) occurs with negligible probability. Therefore, Alice's choice of a is fixed before she sees b, ensuring a⊕b remains uniformly distributed.
+
+If Alice uses a weak deterministic hash:  C=H(a) where a∈{0,1},
+
+Binding: Holds. It is computationally infeasible to finds H(0)==H(1) (Collision Resistance) therefore its impossible for Alice to cheat.
+
+Hiding: Fails completely. Because the domain ∣a∣=2 it means that Bob computes H(0) and H(1). He can simply check if C==H(0) or C==H(1). Therefore allowing bob to, Pr[Bob(C)→a]=1 so it means that Bob can cheat with 100% success.
+
+A fair coin flip function requires both hiding and binding, as one property alone is not enough. If it is only hiding (but not binding) it means that Alice can cheat; If it is only binding (but not hiding) it means that Bob can cheat cheat. A secure, randomized hash commitment C=H(r∣∣a) provides both hashing and binding, forcing both parties to act blindly and irrevocably, which allows for a mathematically guaranteed fair 50/50 output via the XOR operation.
 
 ---
 
@@ -614,89 +619,65 @@ import random
 N = 100
 M = 3 * N
 
-inputs = [17, 42, 23]
-
+#The secrets of Alice, Bob, and Charlie
+inputs = [17, 42, 23] 
+print(f"--- Secure Summation Protocol ---")
+print(f"True hidden inputs (Alice, Bob, Charlie): {inputs}")
+print(f"True Total (What they want to find): {sum(inputs)}")
 
 def share_value(x, num_parties=3, mod=M):
-    shares = [random.randint(0, mod - 1) for _ in range(num_parties - 1)]
+    """Splits a secret into random shares that sum to 'x (mod M)'."""
+    #Generates a random share for the first n-1 parties
+    shares = [random.randint(0, mod-1) for _ in range(num_parties-1)]
+    #The final share is calculated to ensure the sum equals x
     final_share = (x - sum(shares)) % mod
     shares.append(final_share)
     return shares
 
+#Each party splits their input into 3 shares, matrix[i] represents the shares generated by party i
+matrix = [share_value(x) for x in inputs]
 
-print("=== Secure Summation Protocol (3 parties) ===\n")
+#Distribution
+#Party j receives matrix[0][j], matrix[1][j], matrix[2][j], Each party sums the shares they received
+column_sums = [sum(matrix[i][j] for i in range(3)) % M for j in range(3)]
 
-for run in range(1, 4):
-    matrix = [share_value(x) for x in inputs]
-    column_sums = [sum(matrix[i][j] for i in range(3)) % M for j in range(3)]
-    total = sum(column_sums) % M
-    actual = sum(inputs) % M
+#The parties publicly share their column sums and then add them together
+total = sum(column_sums) % M
 
-    print(f"Run {run}:")
-    print(f"  Inputs:          {inputs}")
-    for i, row in enumerate(matrix):
-        print(f"  Party {i+1} shares:  {row}")
-    print(f"  Column sums:     {column_sums}")
-    print(f"  Recovered total: {total}")
-    print(f"  Actual total:    {actual}")
-    print(f"  Match:           {total == actual}\n")
+print("\nSplitting Inputs into Shares")
+print(f"Alice's shares:   {matrix[0]}")
+print(f"Bob's shares:     {matrix[1]}")
+print(f"Charlie's shares: {matrix[2]}")
+
+print("\nDistributing and Summing Columns")
+print(f"Alice's received sum:   {column_sums[0]}")
+print(f"Bob's received sum:     {column_sums[1]}")
+print(f"Charlie's received sum: {column_sums[2]}")
+
+print("\nPublic Aggregation")
+print(f"Recovered total: {total}")
+print(f"Actual total mod M: {sum(inputs) % M}")
+
+#Validation
+assert total == sum(inputs) % M
+print("Protocol Successful!")
 ```
 
 ### Output Evidence
 
-```
-=== Secure Summation Protocol (3 parties) ===
-
-Run 1:
-  Inputs:          [17, 42, 23]
-  Party 1 shares:  [114, 155, 48]
-  Party 2 shares:  [207, 268, 167]
-  Party 3 shares:  [192, 284, 147]
-  Column sums:     [213, 107, 62]
-  Recovered total: 82
-  Actual total:    82
-  Match:           True
-
-Run 2:
-  Inputs:          [17, 42, 23]
-  Party 1 shares:  [57, 212, 48]
-  Party 2 shares:  [211, 137, 294]
-  Party 3 shares:  [2, 77, 244]
-  Column sums:     [270, 126, 286]
-  Recovered total: 82
-  Actual total:    82
-  Match:           True
-
-Run 3:
-  Inputs:          [17, 42, 23]
-  Party 1 shares:  [242, 98, 277]
-  Party 2 shares:  [110, 15, 217]
-  Party 3 shares:  [209, 232, 182]
-  Column sums:     [261, 45, 76]
-  Recovered total: 82
-  Actual total:    82
-  Match:           True
-```
-
-> [SCREENSHOT – terminal running secure_summation.py showing 3 runs all matching]
+![Task 11 Outputs](Task111.png)
+![Task 11 Outputs](Task112.png)
+![Task 11 Outputs](Task113.png)
 
 ### Explanation
 
-Individual shares do not reveal a private input because each party's share is an independently chosen random value modulo M. Party 1's input of 17 might be split into shares `[114, 155, 48]`. Any one of those numbers is statistically independent of 17—it is drawn uniformly at random from `{0, ..., M-1}`. A party who receives only one share cannot distinguish whether the original input was 17 or any other value. Privacy holds as long as at least one share stays private.
+Individual shares do not reveal the private input directly instead we look at Alice's shares in the output. Because the first two shares are generated purely at random, the shares look like completely a meaningless output of randomness. Bob receives 88 from Alice, which tells him absolutely nothing about her true salary of 17 so this means the secret is perfectly hidden.  
 
-The final sum is still recovered correctly because of the algebraic property of additive shares. Each party's shares sum to their input modulo M:
+The final sum is still recovered correctly it's just that the protocol works because modular arithmetic is commutative and associative so adding the rows and then the columns is mathematically identical to adding the columns and then the rows.  
 
-```
-x_{i,1} + x_{i,2} + x_{i,3} ≡ x_i (mod M)
-```
+(x1,1 + x1,2 + x1,3)+(x2,1 + etc. )≡(x1,1 + x2,1 + etc. )(modM)  
 
-When we sum all three column sums, we are summing every share across every party, which equals the sum of all inputs modulo M:
-
-```
-C_1 + C_2 + C_3 ≡ x_1 + x_2 + x_3 (mod M)
-```
-
-This connects to the secure summation protocol from the slides, which shows that secret sharing allows parties to jointly compute a linear function of their inputs without revealing the inputs themselves. The sum is computable from public column aggregates while each individual input remains hidden.
+This connects to the secure summation slides as it proves that multiple parties can collaborate to compute a global function (the sum) while maintaining perfect privacy over their local inputs, utilizing randomness as a mathematical shield.  
 
 ---
 
@@ -704,198 +685,18 @@ This connects to the secure summation protocol from the slides, which shows that
 
 ### Comparison Table
 
-| Mechanism          | Hiding | Binding | Weakness                              |
-| ------------------ | ------ | ------- | ------------------------------------- |
-| Naive Casino       | No     | No      | Casino sees guess before choosing T   |
-| Deterministic Hash | No     | Yes     | Brute-forceable in small domains      |
-| Randomized Hash    | Yes    | Yes     | Security relies on collision resistance of hash |
-| Coin Flip Protocol | Yes    | Yes     | Requires both properties; breaks if either fails |
+| Mechanism          | Solves Fairness? | Hiding | Binding | Weakness                              |
+| -------------------| ------------- | ------ | ------- | ------------------------------------- |
+| Naive Casino       | No | No (N/A)    | No (N/A)      | Casino has access to all information and can guess based on this information  |
+| Weak Deterministic Hash | No (Typically) | No    | Yes     | Vulnerable to brute force dictionary attacks      |
+| Randomized Hash Commitment   | Yes | Yes    | Yes     | Security relies on collision resistance of has |
+| Coin Flip Protocol | Yes | Yes    | Yes     | Requires both properties; breaks if either fails |
 
 ---
 
 ### Reflection
 
-**Why the naive casino protocol is unfair**
-
-The protocol allows the casino to observe the player's guess G before choosing its own value T. Because the casino moves second with full knowledge of G, it can always pick T ≠ G. The protocol appears random on the surface, but the asymmetric information flow lets the casino eliminate the only winning outcome. The problem is not weak randomness—it is that the order of messages gives one party a decisive information advantage.
-
-**Why commitment schemes repair that fairness problem**
-
-A commitment scheme forces the first mover to lock in a value before the second party responds. In the repaired protocol, the player commits to G, the casino chooses T without seeing G, then the player reveals G. Because the commitment is binding, the player cannot change G after seeing T. Because the commitment is hiding, the casino cannot see G before choosing T. Both parties move under uncertainty, and neither can adapt to the other's choice.
-
-**Why deterministic hashing fails hiding in small domains**
-
-`H(m)` is a fixed, public, computable function. When the message space has only 100 elements, an adversary builds a lookup table of all 100 hash values and finds a match for any observed commitment in at most 100 steps. The hash function itself is not broken; the failure comes from a small domain making exhaustive search practical.
-
-**Why adding randomness changes the security picture**
-
-The scheme `H(r || m)` with a fresh 128-bit nonce `r` explodes the effective search space from 100 to 2^128. An adversary who sees the commitment cannot recover m by enumeration because they would need to guess r as well. Each commitment to the same message looks completely different, preventing dictionary-style attacks.
-
-**Why hiding and binding are different and complementary**
-
-Hiding protects the committed value from being learned before the reveal phase—it is a privacy guarantee directed at the receiver. Binding prevents the committer from opening the same commitment to a different value—it is an integrity guarantee directed at the committer. A scheme can fail one property while satisfying the other. For example, a scheme that returns the message in plaintext is perfectly binding but not hiding at all. Both properties are required simultaneously for commitment schemes to be useful in protocols.
-
-**How coin flipping uses commitment to enforce fairness**
-
-Alice commits to her bit `a` before Bob chooses `b`. The hiding property stops Bob from learning `a` and biasing his choice. The binding property stops Alice from changing `a` after seeing `b`. The output `c = a XOR b` is then a uniform bit that neither party controlled, because each party's input was locked before the other's was visible.
-
-**How secure summation extends the same mindset toward secure multiparty computation**
-
-Secure summation shows that cryptographic techniques can let multiple parties compute a joint function—here, a sum—without any party learning the individual inputs of the others. The additive share mechanism provides information-theoretic privacy for each input: any single share is statistically independent of the original value. This is a direct instance of secure multiparty computation, where the goal is to compute functions on private data without a trusted third party. Commitment schemes play a related role in larger MPC protocols by ensuring parties commit to inputs before the computation begins, preventing adaptive manipulation.
-
----
-
-## Appendix – Scripts
-
-### task3_commitment_utils.py
-
-```python
-import hashlib
-import secrets
-
-
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def commit_hash_deterministic(message: str):
-    c = sha256_bytes(message.encode())
-    return c, {"message": message}
-
-
-def verify_hash_deterministic(c: str, opening: dict) -> bool:
-    message = opening["message"]
-    return sha256_bytes(message.encode()) == c
-
-
-def commit_hash_randomized(message: str):
-    r = secrets.token_bytes(16)
-    c = sha256_bytes(r + message.encode())
-    return c, {"message": message, "randomness_hex": r.hex()}
-
-
-def verify_hash_randomized(c: str, opening: dict) -> bool:
-    message = opening["message"]
-    r = bytes.fromhex(opening["randomness_hex"])
-    return sha256_bytes(r + message.encode()) == c
-```
-
-### task4_weak_hash_attack.py
-
-```python
-import hashlib
-from commitment_utils import commit_hash_deterministic
-
-secrets_to_test = ["77", "17", "42", "99", "1"]
-
-for secret_message in secrets_to_test:
-    c, opening = commit_hash_deterministic(secret_message)
-    recovered = None
-    for i in range(1, 101):
-        if hashlib.sha256(str(i).encode()).hexdigest() == c:
-            recovered = str(i)
-            break
-    print(f"Secret: {secret_message}  Recovered: {recovered}  Match: {recovered == secret_message}")
-```
-
-### task5_randomized_hash_experiment.py
-
-```python
-from commitment_utils import commit_hash_randomized, verify_hash_randomized
-
-m = "42"
-for _ in range(5):
-    c, opening = commit_hash_randomized(m)
-    ok = verify_hash_randomized(c, opening)
-    print("Commitment:", c, "| Verify:", ok)
-```
-
-### task6_hiding_experiment.py
-
-```python
-import random
-import hashlib
-from commitment_utils import commit_hash_deterministic, commit_hash_randomized
-
-m0, m1 = "17", "42"
-
-def attacker_deterministic(c):
-    return 0 if hashlib.sha256(m0.encode()).hexdigest() == c else 1
-
-def attacker_randomized(c):
-    return random.randint(0, 1)
-
-def run_trials(commit_func, attacker, trials=100):
-    wins = sum(
-        1 for _ in range(trials)
-        if attacker(commit_func(m0 if (b := random.randint(0, 1)) == 0 else m1)[0]) == b
-    )
-    return wins / trials
-
-print("Deterministic:", run_trials(commit_hash_deterministic, attacker_deterministic))
-print("Randomized:   ", run_trials(commit_hash_randomized, attacker_randomized))
-```
-
-### task8_toy_symmetric_commit.py
-
-```python
-import secrets
-
-def xor_key_stream(key, length):
-    s = b""
-    while len(s) < length:
-        s += key
-    return s[:length]
-
-def toy_encrypt(key, message):
-    mb = message.encode()
-    return bytes(a ^ b for a, b in zip(mb, xor_key_stream(key, len(mb))))
-
-def toy_decrypt(key, ciphertext):
-    return bytes(a ^ b for a, b in zip(ciphertext, xor_key_stream(key, len(ciphertext)))).decode()
-
-def commit_symmetric(message):
-    key = secrets.token_bytes(16)
-    return toy_encrypt(key, message), {"message": message, "key_hex": key.hex()}
-
-def verify_symmetric(commitment, opening):
-    return toy_decrypt(bytes.fromhex(opening["key_hex"]), commitment) == opening["message"]
-```
-
-### task9_coinflip.py
-
-```python
-import random
-from commitment_utils import commit_hash_randomized, verify_hash_randomized
-
-for trial in range(1, 21):
-    a = str(random.randint(0, 1))
-    C, opening = commit_hash_randomized(a)
-    b = random.randint(0, 1)
-    ok = verify_hash_randomized(C, opening)
-    if ok:
-        c = int(opening["message"]) ^ b
-        print(f"Trial {trial:02d}: Alice={a}, Bob={b}, coin={c}, verify=OK")
-```
-
-### task11_secure_summation.py
-
-```python
-import random
-
-N, M = 100, 300
-inputs = [17, 42, 23]
-
-def share_value(x, mod=M):
-    shares = [random.randint(0, mod - 1) for _ in range(2)]
-    shares.append((x - sum(shares)) % mod)
-    return shares
-
-matrix = [share_value(x) for x in inputs]
-column_sums = [sum(matrix[i][j] for i in range(3)) % M for j in range(3)]
-total = sum(column_sums) % M
-print("Recovered total:", total, "| Actual:", sum(inputs) % M)
-```
+The fundamental lesson we test in this lab is whether or not secrecy alone can solve the problem of protocol fairness or not, we see that cryptographic systems must also enforce chronological commitment. The naive casino protocol demonstrated that in distributed systems the order of information flow dictates power. If one party can delay their choice until they see the other party's input it means that they can adapt and cheat to win. Commitment schemes repair this by severing the act of choosing a value from the subsequent act of revealing it. However, implementing a commitment scheme requires a careful design, as deterministic hashing fails at hiding if the message space is too small, as an adversary can simply brute force the hash. Adding randomness (r) is mandatory to mathematically obscure our message and restore the hiding property. Furthermore, the commitment must be cryptographically binding to ensure that the sender cannot alter their choice later. The fair coin-flipping protocol proved that when both hiding and binding are present the two mutually distrustful parties can collaboratively generate an unbiased result without a central authority. Finally, the Secure Summation protocol extended this mindset to a Secure Multiparty Computation protocol by breaking the inputs into independent random shares, participants can cooperate to compute a global function without ever exposing their individual data. In all these scenarios, randomness acts as the essential shield that allows trustless cooperation over insecure networks.
 
 ---
 
